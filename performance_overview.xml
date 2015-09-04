@@ -1,0 +1,73 @@
+<form>
+  <label>Performance Overview</label>
+  <fieldset submitButton="false">
+    <input type="time" token="global_time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Overview by Mobile Page View</title>
+      <table>
+        <search>
+          <query>sourcetype=mint:network | eval sla=1000 | stats count count(eval(latency &gt; sla)) as sla_violations sparkline(avg(latency)) as latency avg(latency) as average median(latency) as median perc95(latency) as "95th percentile" by currentView | eval average=round(average,2) | eval "% SLA violations"=round((sla_violations/count)*100,2) | rename count as "# total views" | rename sla_violations as "# SLA violations" | fields currentView "# total views" "# SLA violations" "% SLA violations" latency average median "95th percentile" | sort -"% SLA violations"</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <set token="currentView">$row.currentView$</set>
+        </drilldown>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$currentView$">
+      <title>Average Latency (ms) for $currentView$</title>
+      <chart>
+        <search>
+          <query>sourcetype=mint:network currentView=$currentView$ | timechart count avg(latency) as latency</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.overlayFields">count</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.placement">right</option>
+        <selection>
+          <set token="selection.earliest">$start$</set>
+          <set token="selection.latest">$end$</set>
+        </selection>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$currentView$">
+      <chart>
+        <title>Latency (ms) breakdown by URL for $currentView$</title>
+        <search>
+          <query>sourcetype=mint:network currentView=$currentView$ | chart eval(round(avg(latency),1)) as average by url | sort -average</query>
+          <earliest>$selection.earliest$</earliest>
+          <latest>$selection.latest$</latest>
+        </search>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.overlayFields">count</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+      </chart>
+    </panel>
+  </row>
+</form>

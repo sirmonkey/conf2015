@@ -1,0 +1,200 @@
+<form>
+  <label>Performance Overview</label>
+  <fieldset submitButton="false">
+    <input type="time" token="global_time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>0</earliest>
+        <latest></latest>
+      </default>
+    </input>
+    <input type="dropdown" token="platform" searchWhenChanged="true">
+      <label>OS Platform</label>
+      <search>
+        <query>index=conf2015 sourcetype=mint:network | top limit=0 platform | fields platform</query>
+      </search>
+      <fieldForLabel>platform</fieldForLabel>
+      <fieldForValue>platform</fieldForValue>
+      <!-- <prefix>platform="</prefix> -->
+      <!-- <suffix>"</suffix> -->
+      <choice value="*">All</choice>
+      <default>*</default>
+    </input>
+    <input type="dropdown" token="carrier" searchWhenChanged="true">
+      <label>Carrier</label>
+      <search>
+        <query>index=conf2015 sourcetype=mint:network | top limit=0 carrier | fields carrier</query>
+      </search>
+      <fieldForLabel>carrier</fieldForLabel>
+      <fieldForValue>carrier</fieldForValue>
+      <!-- <prefix>carrier="</prefix> -->
+      <!-- <suffix>"</suffix> -->
+      <choice value="*">All</choice>
+      <default>*</default>
+    </input>
+    <input type="dropdown" token="connection" searchWhenChanged="true">
+      <label>Connection Type</label>
+      <search>
+        <query>index=conf2015 sourcetype=mint:network | top limit=0 connection | fields connection</query>
+      </search>
+      <fieldForLabel>connection</fieldForLabel>
+      <fieldForValue>connection</fieldForValue>
+      <!-- <prefix>connection="</prefix> -->
+      <!-- <suffix>"</suffix> -->
+      <choice value="*">All</choice>
+      <default>*</default>
+    </input>
+    <input type="dropdown" token="appVersionName" searchWhenChanged="true">
+      <label>App Version</label>
+      <search>
+        <query>index=conf2015 sourcetype=mint:network | top limit=0 appVersionName | fields appVersionName</query>
+      </search>
+      <fieldForLabel>appVersionName</fieldForLabel>
+      <fieldForValue>appVersionName</fieldForValue>
+      <!-- <prefix>appVersionName="</prefix> -->
+      <!-- <suffix>"</suffix> -->
+      <choice value="*">All</choice>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Overview by Mobile Page View</title>
+      <table>
+        <search>
+          <query>index=conf2015 sourcetype=mint:network platform="$platform$" carrier="$carrier$" connection="$connection$" appVersionName="$appVersionName$" | lookup sla_by_view.csv currentView OUTPUT sla | chart count first(sla) as SLA count(eval(latency &gt; sla)) as sla_violations sparkline(avg(latency)) as "Latency (ms)" eval(round(avg(latency),2)) as Average median(latency) as Median perc5(latency) as "5th percentile" perc95(latency) as "95th percentile" by currentView | eval "% SLA violations"=round((sla_violations/count)*100,2) | rename count as "# total views" | rename sla_violations as "# SLA violations" | fields currentView "# total views" "# SLA violations" "% SLA violations" SLA "Latency (ms)" Average Median "5th percentile" "95th percentile" | sort -"% SLA violations"</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <set token="currentView">$row.currentView$</set>
+          <set token="SLA">$row.SLA$</set>
+          <set token="latency_avg">$row.Average$</set>
+        </drilldown>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$currentView$">
+      <title>Average Latency (ms) for $currentView$ - SLA: $SLA$ (ms) - Average: $latency_avg$ (ms)</title>
+      <chart>
+        <search>
+          <query>index=conf2015 sourcetype=mint:network platform="$platform$" carrier="$carrier$" connection="$connection$" appVersionName="$appVersionName$" currentView=$currentView$ | timechart count avg(latency) as latency</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.axisY2.enabled">true</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.overlayFields">count</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.placement">right</option>
+        <selection>
+          <set token="selection.earliest">$start$</set>
+          <set token="selection.latest">$end$</set>
+        </selection>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Latency (ms)</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$currentView$">
+      <input type="dropdown" token="breakdownBy">
+        <label>Breakdown By</label>
+        <choice value="url">URL</choice>
+        <choice value="platform">Platform</choice>
+        <choice value="carrier">Carrier</choice>
+        <choice value="connection">Connection</choice>
+        <choice value="appVersionName">App Version</choice>
+        <default>url</default>
+      </input>
+      <!-- <input type="link" token="breakdownBy" searchWhenChanged="true">
+        <label></label>
+        <choice value="platform">Platform</choice>
+        <choice value="carrier">Carrier</choice>
+        <choice value="connection">Connection</choice>
+        <choice value="appVersionName">App Version</choice>
+        <default>Platform</default>
+        <change>
+          <condition value="platform">
+            <set token="breakdownBy">platform</set>
+          </condition>
+          <condition value="carrier">
+            <set token="breakdownBy">carrier</set>
+          </condition>
+          <condition value="connection">
+            <set token="breakdownBy">connection</set>
+          </condition> 
+          <condition value="appVersionName">
+            <set token="breakdownBy">appVersionName</set>
+          </condition>           
+        </change>
+      </input> -->    
+      <chart>
+        <title>Latency (ms) breakdown by $breakdownBy$ for View: $currentView$</title>
+        <search>
+          <query>index=conf2015 sourcetype=mint:network platform="$platform$" carrier="$carrier$" connection="$connection$" appVersionName="$appVersionName$" currentView=$currentView$ | rex field=url "^(?&lt;url_domain&gt;.+?)\/" | chart eval(round(avg(latency),1)) as average by $breakdownBy$ | sort -average</query>
+          <earliest>$selection.earliest$</earliest>
+          <latest>$selection.latest$</latest>
+        </search>
+        <option name="charting.axisY2.enabled">true</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.overlayFields">count</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text"></option>
+        <option name="charting.axisTitleY.text">Average Latency (ms)</option>
+        <!-- <drilldown>
+          <condition field="breakdownBy" value="carrier">
+            <link target="_blank">
+              <![CDATA[performance_overview_v2?form.platform=$platform$&form.carrier=$click.value$&form.connection=$connection$&form.appVersionName=$appVersionName$]]>
+            </link>
+          </condition>            
+          <condition field="breakdownBy" value="platform">
+            <link target="_blank">
+              <![CDATA[performance_overview_v2?form.platform=$click.value$&form.carrier=$carrier$&form.connection=$connection$&form.appVersionName=$appVersionName$]]>
+            </link>
+          </condition>        
+        </drilldown> -->
+      </chart>
+    </panel>
+  </row>
+</form>
